@@ -129,6 +129,27 @@ export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigCha
         </div>
       )}
 
+      {/* Tealium Cross-Device Toggle (visible for FBS + GBS) */}
+      {config.method !== 'none' && (
+        <div className="p-4 border-b border-gray-700 space-y-2">
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">External Resolution</label>
+          <label className="flex items-start gap-2 text-sm text-gray-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.tealiumCrossDevice}
+              onChange={(e) => update({ tealiumCrossDevice: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-800 text-cyan-500 mt-0.5"
+            />
+            <div>
+              <span className="font-medium">Tealium Cross-Device</span>
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Simulates Tealium AudienceStream stitching visitor profiles server-side and sending resolved links to AEP. When off, each TealiumVisitorID is an isolated device cookie.
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
+
       {/* Graph Configuration (GBS only) */}
       {config.method === 'gbs' && (
         <div className="p-4 border-b border-gray-700 space-y-3">

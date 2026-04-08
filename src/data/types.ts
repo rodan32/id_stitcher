@@ -61,6 +61,7 @@ export interface StitchConfig {
   ioaEnabled: boolean;
   replayWindow: 1 | 7 | 14 | 30;
   profileEnabledDatasets: DatasetId[];
+  tealiumCrossDevice: boolean;
 }
 
 export interface StitchResult {

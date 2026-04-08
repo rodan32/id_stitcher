@@ -18,6 +18,7 @@ const DEFAULT_CONFIG: StitchConfig = {
   ioaEnabled: true,
   replayWindow: 7,
   profileEnabledDatasets: ['WebSDK', 'Tealium', 'Marketo'],
+  tealiumCrossDevice: false,
 };
 
 export default function App() {

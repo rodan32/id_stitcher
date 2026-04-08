@@ -12,13 +12,66 @@ export function computeStitch(scenario: Scenario, config: StitchConfig): StitchO
     return computeNoStitch(scenario);
   }
 
-  const { graphNodes, graphEdges } = buildIdentityGraph(scenario, config);
+  // When Tealium cross-device is enabled, pre-enrich Tealium events:
+  // if one TealiumVisitorID has a person-level ID and another doesn't,
+  // Tealium's master profile would have resolved it and sent it downstream.
+  const effectiveScenario = config.tealiumCrossDevice
+    ? applyTealiumEnrichment(scenario)
+    : scenario;
+
+  const { graphNodes, graphEdges } = buildIdentityGraph(effectiveScenario, config);
 
   if (config.method === 'fbs') {
-    return computeFBS(scenario, config, graphNodes, graphEdges);
+    return computeFBS(effectiveScenario, config, graphNodes, graphEdges);
   }
 
-  return computeGBS(scenario, config, graphNodes, graphEdges);
+  return computeGBS(effectiveScenario, config, graphNodes, graphEdges);
+}
+
+/**
+ * Simulates Tealium AudienceStream enrichment: when cross-device stitching
+ * is on, Tealium's master profile knows the resolved person-level IDs for
+ * all stitched TealiumVisitorIDs. Events that originally lacked a person-
+ * level ID get enriched with one, as if Tealium sent the resolved identity
+ * downstream to AEP.
+ */
+function applyTealiumEnrichment(scenario: Scenario): Scenario {
+  const PERSON_NS: NamespaceId[] = ['Email', 'Phone', 'WGU_ID', 'MarketoLeadID', 'SFDCContactID'];
+
+  // Build a map: for each person-level NS, collect all values seen on any
+  // event that also has a TealiumVisitorID (regardless of which TEA-x)
+  const tealiumPersonIds = new Map<NamespaceId, string>();
+  for (const evt of scenario.events) {
+    if (!evt.identifiers['TealiumVisitorID']) continue;
+    for (const pns of PERSON_NS) {
+      const pval = evt.identifiers[pns];
+      if (pval && !tealiumPersonIds.has(pns)) {
+        tealiumPersonIds.set(pns, pval);
+      }
+    }
+  }
+
+  if (tealiumPersonIds.size === 0) return scenario;
+
+  // Enrich: any event with a TealiumVisitorID that is missing a known
+  // person-level ID gets it added (Tealium resolved it server-side)
+  const enrichedEvents = scenario.events.map(evt => {
+    if (!evt.identifiers['TealiumVisitorID']) return evt;
+
+    let needsEnrich = false;
+    for (const [pns] of tealiumPersonIds) {
+      if (!evt.identifiers[pns]) { needsEnrich = true; break; }
+    }
+    if (!needsEnrich) return evt;
+
+    const newIds = { ...evt.identifiers };
+    for (const [pns, pval] of tealiumPersonIds) {
+      if (!newIds[pns]) newIds[pns] = pval;
+    }
+    return { ...evt, identifiers: newIds };
+  });
+
+  return { ...scenario, events: enrichedEvents };
 }
 
 function computeNoStitch(scenario: Scenario): StitchOutput {
@@ -287,6 +340,14 @@ function buildIdentityGraph(scenario: Scenario, config: StitchConfig): { graphNo
     }
   }
 
+  // Tealium cross-device resolution: bridge TealiumVisitorIDs that share
+  // a person-level identifier through Tealium events. This simulates
+  // AudienceStream stitching profiles server-side and feeding resolved
+  // links into the AEP identity graph.
+  if (config.tealiumCrossDevice) {
+    addTealiumCrossDeviceBridges(scenario, nodeMap, edges);
+  }
+
   // Apply IOA / unique namespace constraints for GBS
   if (config.method === 'gbs' && config.ioaEnabled) {
     applyIOA(edges, config.uniqueNamespaces);
@@ -357,6 +418,72 @@ function buildRawGraph(scenario: Scenario): { graphNodes: GraphNode[]; graphEdge
   }
 
   return { graphNodes: Array.from(nodeMap.values()), graphEdges: edges };
+}
+
+function addTealiumCrossDeviceBridges(
+  scenario: Scenario,
+  nodeMap: Map<string, GraphNode>,
+  edges: GraphEdge[]
+) {
+  // Collect all TealiumVisitorIDs and the person-level IDs they co-occur
+  // with on Tealium dataset events. If two different TEA-x values share a
+  // person-level identifier (e.g., both linked to the same email through
+  // separate Tealium events), Tealium's AudienceStream would stitch them
+  // server-side. We model this by adding a direct edge between those
+  // TealiumVisitorIDs, as if Tealium sent the resolved link to AEP.
+  const personToTealiumIds = new Map<string, { tealiumId: string; eventIdx: number }[]>();
+  const PERSON_NS: NamespaceId[] = ['Email', 'Phone', 'WGU_ID', 'MarketoLeadID', 'SFDCContactID'];
+
+  for (let i = 0; i < scenario.events.length; i++) {
+    const evt = scenario.events[i];
+    const teaId = evt.identifiers['TealiumVisitorID'];
+    if (!teaId) continue;
+
+    // Find any person-level ID on this event
+    for (const pns of PERSON_NS) {
+      const pval = evt.identifiers[pns];
+      if (pval) {
+        const key = `${pns}:${pval}`;
+        if (!personToTealiumIds.has(key)) personToTealiumIds.set(key, []);
+        personToTealiumIds.get(key)!.push({ tealiumId: teaId, eventIdx: i });
+      }
+    }
+  }
+
+  // For each person-level ID that has multiple distinct TealiumVisitorIDs,
+  // bridge those TEA-x values together
+  for (const [_personKey, entries] of personToTealiumIds) {
+    const uniqueTea = new Map<string, number>(); // tealiumId -> first event
+    for (const e of entries) {
+      if (!uniqueTea.has(e.tealiumId)) uniqueTea.set(e.tealiumId, e.eventIdx);
+    }
+    const teaIds = Array.from(uniqueTea.entries());
+    if (teaIds.length < 2) continue;
+
+    // Create edges between each pair of TealiumVisitorIDs
+    for (let a = 0; a < teaIds.length; a++) {
+      for (let b = a + 1; b < teaIds.length; b++) {
+        // Ensure nodes exist
+        const keyA = `TealiumVisitorID:${teaIds[a][0]}`;
+        const keyB = `TealiumVisitorID:${teaIds[b][0]}`;
+        if (!nodeMap.has(keyA)) {
+          nodeMap.set(keyA, { id: keyA, namespace: 'TealiumVisitorID', value: teaIds[a][0], level: 'device' });
+        }
+        if (!nodeMap.has(keyB)) {
+          nodeMap.set(keyB, { id: keyB, namespace: 'TealiumVisitorID', value: teaIds[b][0], level: 'device' });
+        }
+
+        edges.push({
+          source: teaIds[a][0],
+          target: teaIds[b][0],
+          sourceNs: 'TealiumVisitorID',
+          targetNs: 'TealiumVisitorID',
+          fromEvent: Math.max(teaIds[a][1], teaIds[b][1]),
+          active: true,
+        });
+      }
+    }
+  }
 }
 
 function groupByDatasetAndPersistent(

@@ -263,7 +263,7 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
 
       {/* Verdict below diagram */}
       <div className="mt-4 max-w-2xl">
-        <VerdictBox scenario={scenario} />
+        <VerdictBox scenario={scenario} config={config} stitchOutput={stitchOutput} />
       </div>
     </div>
   );

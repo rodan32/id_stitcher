@@ -182,7 +182,7 @@ export function GraphView({ stitchOutput, config }: Props) {
   }, [nodes, links]);
 
   return (
-    <div ref={containerRef} className="flex-1 bg-gray-950 relative">
+    <div ref={containerRef} className="flex-1 min-h-0 min-w-0 bg-gray-950 relative">
       <svg ref={svgRef} className="w-full h-full" />
       {/* Legend */}
       <div className="absolute bottom-4 left-4 bg-gray-900/90 rounded-lg p-3 text-sm space-y-1.5 border border-gray-700">

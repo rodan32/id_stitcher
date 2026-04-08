@@ -17,7 +17,7 @@ export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigCha
   };
 
   return (
-    <div className="bg-gray-900 border-r border-gray-700 w-80 min-w-80 overflow-y-auto flex flex-col">
+    <div className="bg-gray-900 border-r border-gray-700 w-64 min-w-56 xl:w-80 xl:min-w-80 overflow-y-auto flex flex-col">
       {/* Scenario Picker */}
       <div className="p-4 border-b border-gray-700">
         <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Scenario</label>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { StitchConfig } from './data/types';
 import { SCENARIOS } from './data/scenarios';
 import { computeStitch } from './engine/stitcher';
@@ -21,10 +21,24 @@ const DEFAULT_CONFIG: StitchConfig = {
   tealiumCrossDevice: false,
 };
 
+function useIsCompact() {
+  const [compact, setCompact] = useState(window.innerWidth < 1400);
+  useEffect(() => {
+    const onResize = () => setCompact(window.innerWidth < 1400);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return compact;
+}
+
 export default function App() {
   const [scenarioId, setScenarioId] = useState(1);
   const [config, setConfig] = useState<StitchConfig>(DEFAULT_CONFIG);
   const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const isCompact = useIsCompact();
+
+  // On compact screens, split view stacks vertically; show a hint
+  const effectiveView = viewMode;
 
   const scenario = useMemo(() => SCENARIOS.find(s => s.id === scenarioId)!, [scenarioId]);
   const stitchOutput = useMemo(() => computeStitch(scenario, config), [scenario, config]);
@@ -32,20 +46,20 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-white overflow-hidden">
       {/* Top bar */}
-      <header className="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-bold tracking-tight">
+      <header className="bg-gray-900 border-b border-gray-700 px-3 xl:px-4 py-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 xl:gap-3 min-w-0">
+          <h1 className="text-sm xl:text-base font-bold tracking-tight whitespace-nowrap">
             <span className="text-blue-400">ID</span> Stitcher
           </h1>
-          <span className="text-xs text-gray-500 hidden sm:inline">Adobe CJA Identity Stitching Explorer</span>
+          <span className="text-xs text-gray-500 hidden md:inline truncate">Adobe CJA Identity Stitching Explorer</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex gap-0.5 bg-gray-800 rounded-lg p-0.5">
             {(['timeline', 'split', 'graph'] as ViewMode[]).map(mode => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-1 text-xs rounded-md font-medium transition-all ${
+                className={`px-2 xl:px-3 py-1 text-xs rounded-md font-medium transition-all ${
                   viewMode === mode
                     ? 'bg-gray-600 text-white'
                     : 'text-gray-400 hover:text-white'
@@ -68,12 +82,17 @@ export default function App() {
           onConfigChange={setConfig}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 flex overflow-hidden">
-            {(viewMode === 'timeline' || viewMode === 'split') && (
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Visualization area */}
+          <div className={`flex-1 overflow-hidden ${
+            effectiveView === 'split'
+              ? isCompact ? 'flex flex-col' : 'flex'
+              : 'flex'
+          }`}>
+            {(effectiveView === 'timeline' || effectiveView === 'split') && (
               <TimelineView scenario={scenario} config={config} stitchOutput={stitchOutput} />
             )}
-            {(viewMode === 'graph' || viewMode === 'split') && (
+            {(effectiveView === 'graph' || effectiveView === 'split') && (
               <GraphView stitchOutput={stitchOutput} config={config} />
             )}
           </div>
@@ -96,7 +115,7 @@ function NamespaceLegend() {
   ];
 
   return (
-    <div className="hidden lg:flex items-center gap-2 text-xs text-gray-400">
+    <div className="hidden xl:flex items-center gap-2 text-xs text-gray-400">
       {items.map(item => (
         <span key={item.label} className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: item.color }} />

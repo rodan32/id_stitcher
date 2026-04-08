@@ -9,7 +9,7 @@ interface Props {
 
 export function EventDetail({ events, results }: Props) {
   return (
-    <div className="bg-gray-900 border-t border-gray-700 overflow-auto max-h-64">
+    <div className="bg-gray-900 border-t border-gray-700 overflow-auto max-h-40 xl:max-h-64">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-gray-400 border-b border-gray-700">

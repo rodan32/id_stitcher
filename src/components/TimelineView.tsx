@@ -62,7 +62,7 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
   const height = TOP_PADDING + LANE_HEIGHT * datasets.length + 60;
 
   return (
-    <div className="overflow-auto flex-1 bg-gray-950 p-4">
+    <div className="overflow-auto flex-1 min-h-0 min-w-0 bg-gray-950 p-3 xl:p-4">
       <div className="mb-4">
         <h2 className="text-lg font-bold text-white">{scenario.id}. {scenario.title}</h2>
         <p className="text-sm text-gray-400">{scenario.journey}</p>

@@ -1,0 +1,395 @@
+import { Scenario, StitchConfig, StitchResult, GraphEdge, GraphNode, NamespaceId, TimelineEvent } from '../data/types';
+
+export interface StitchOutput {
+  results: StitchResult[];
+  graphNodes: GraphNode[];
+  graphEdges: GraphEdge[];
+  personIdValues: Map<number, string | null>;
+}
+
+export function computeStitch(scenario: Scenario, config: StitchConfig): StitchOutput {
+  if (config.method === 'none') {
+    return computeNoStitch(scenario);
+  }
+
+  const { graphNodes, graphEdges } = buildIdentityGraph(scenario, config);
+
+  if (config.method === 'fbs') {
+    return computeFBS(scenario, config, graphNodes, graphEdges);
+  }
+
+  return computeGBS(scenario, config, graphNodes, graphEdges);
+}
+
+function computeNoStitch(scenario: Scenario): StitchOutput {
+  const results: StitchResult[] = scenario.events.map((evt, i) => ({
+    eventIndex: i,
+    resolvedPersonId: getPersistentValue(evt, 'ECID') || getFirstIdentifier(evt),
+    stitchType: 'none' as const,
+    isOrphaned: false,
+    explanation: 'No stitching applied. Event keyed to its persistent ID.',
+  }));
+
+  const { graphNodes, graphEdges } = buildRawGraph(scenario);
+
+  return {
+    results,
+    graphNodes,
+    graphEdges,
+    personIdValues: new Map(results.map(r => [r.eventIndex, r.resolvedPersonId])),
+  };
+}
+
+function computeFBS(
+  scenario: Scenario,
+  config: StitchConfig,
+  graphNodes: GraphNode[],
+  graphEdges: GraphEdge[]
+): StitchOutput {
+  const results: StitchResult[] = [];
+  const personIdValues = new Map<number, string | null>();
+
+  // Group events by dataset + persistent ID value
+  const groups = groupByDatasetAndPersistent(scenario.events, config.persistentId);
+
+  for (const [_key, eventIndices] of groups) {
+    // Find if any event in this group has the transient ID
+    const transientValues: { index: number; value: string }[] = [];
+    for (const idx of eventIndices) {
+      const evt = scenario.events[idx];
+      const tv = evt.identifiers[config.transientId];
+      if (tv) transientValues.push({ index: idx, value: tv });
+    }
+
+    if (transientValues.length === 0) {
+      // No transient ID in this group - all orphaned
+      for (const idx of eventIndices) {
+        const persistVal = scenario.events[idx].identifiers[config.persistentId];
+        results.push({
+          eventIndex: idx,
+          resolvedPersonId: persistVal || null,
+          stitchType: 'none',
+          isOrphaned: true,
+          explanation: `No ${config.transientId} found on any event sharing this ${config.persistentId}. Cannot stitch.`,
+        });
+        personIdValues.set(idx, persistVal || null);
+      }
+    } else {
+      // FBS device-split: attribute to the most recent transient value at or before each event
+      const firstTransient = transientValues[0];
+      const lastTransient = transientValues[transientValues.length - 1];
+
+      for (const idx of eventIndices) {
+        const evt = scenario.events[idx];
+        const hasTransient = !!evt.identifiers[config.transientId];
+
+        if (hasTransient) {
+          // Live stitch
+          const val = evt.identifiers[config.transientId]!;
+          results.push({
+            eventIndex: idx,
+            resolvedPersonId: val,
+            stitchType: 'live',
+            isOrphaned: false,
+            explanation: `Live stitch: ${config.transientId} present on this event.`,
+          });
+          personIdValues.set(idx, val);
+        } else if (idx < firstTransient.index) {
+          // Pre-first-auth: replay stitches to first transient value
+          results.push({
+            eventIndex: idx,
+            resolvedPersonId: firstTransient.value,
+            stitchType: 'replay',
+            isOrphaned: false,
+            explanation: `Replay stitch: re-keyed to ${firstTransient.value} (first ${config.transientId} on this ${config.persistentId}).`,
+          });
+          personIdValues.set(idx, firstTransient.value);
+        } else {
+          // Between auths or after last auth
+          // Find the most recent transient before this event
+          let nearest = firstTransient;
+          for (const tv of transientValues) {
+            if (tv.index <= idx) nearest = tv;
+          }
+          results.push({
+            eventIndex: idx,
+            resolvedPersonId: nearest.value,
+            stitchType: 'replay',
+            isOrphaned: false,
+            explanation: `Replay stitch: re-keyed to ${nearest.value} (most recent ${config.transientId}).`,
+          });
+          personIdValues.set(idx, nearest.value);
+        }
+      }
+    }
+  }
+
+  // Sort results by event index
+  results.sort((a, b) => a.eventIndex - b.eventIndex);
+
+  return { results, graphNodes, graphEdges, personIdValues };
+}
+
+function computeGBS(
+  scenario: Scenario,
+  config: StitchConfig,
+  graphNodes: GraphNode[],
+  graphEdges: GraphEdge[]
+): StitchOutput {
+  const results: StitchResult[] = [];
+  const personIdValues = new Map<number, string | null>();
+
+  // Build adjacency from active edges for graph traversal
+  const adjacency = new Map<string, Set<string>>();
+  for (const edge of graphEdges) {
+    if (!edge.active) continue;
+    const key = `${edge.sourceNs}:${edge.source}`;
+    const valKey = `${edge.targetNs}:${edge.target}`;
+    if (!adjacency.has(key)) adjacency.set(key, new Set());
+    if (!adjacency.has(valKey)) adjacency.set(valKey, new Set());
+    adjacency.get(key)!.add(valKey);
+    adjacency.get(valKey)!.add(key);
+  }
+
+  for (let i = 0; i < scenario.events.length; i++) {
+    const evt = scenario.events[i];
+    const persistVal = evt.identifiers[config.persistentId];
+
+    if (!persistVal) {
+      // No persistent ID on this event (e.g., Marketo without ECID)
+      // Check if event has target namespace directly
+      const directTarget = evt.identifiers[config.transientId];
+      if (directTarget) {
+        results.push({
+          eventIndex: i,
+          resolvedPersonId: directTarget,
+          stitchType: 'live',
+          isOrphaned: false,
+          explanation: `${config.transientId} present directly on this event. No graph lookup needed.`,
+        });
+        personIdValues.set(i, directTarget);
+      } else {
+        results.push({
+          eventIndex: i,
+          resolvedPersonId: null,
+          stitchType: 'none',
+          isOrphaned: true,
+          explanation: `No ${config.persistentId} and no ${config.transientId} on this event.`,
+        });
+        personIdValues.set(i, null);
+      }
+      continue;
+    }
+
+    // GBS: query graph from persistent ID to find target namespace
+    const startKey = `${config.persistentId}:${persistVal}`;
+    const targetNs = config.transientId; // In GBS, transientId field = target namespace
+
+    // BFS through the graph
+    const resolved = bfsResolve(adjacency, startKey, targetNs);
+
+    if (resolved) {
+      const resolvedValue = resolved.split(':').slice(1).join(':');
+      results.push({
+        eventIndex: i,
+        resolvedPersonId: resolvedValue,
+        stitchType: 'graph',
+        isOrphaned: false,
+        explanation: `Graph resolved: ${config.persistentId}(${persistVal}) → ${targetNs}(${resolvedValue}).`,
+      });
+      personIdValues.set(i, resolvedValue);
+    } else {
+      // Check if event has target directly
+      const directTarget = evt.identifiers[targetNs as NamespaceId];
+      if (directTarget) {
+        results.push({
+          eventIndex: i,
+          resolvedPersonId: directTarget,
+          stitchType: 'live',
+          isOrphaned: false,
+          explanation: `${targetNs} present on this event. Graph not needed.`,
+        });
+        personIdValues.set(i, directTarget);
+      } else {
+        results.push({
+          eventIndex: i,
+          resolvedPersonId: persistVal,
+          stitchType: 'none',
+          isOrphaned: true,
+          explanation: `Graph has no path from ${config.persistentId}(${persistVal}) to any ${targetNs}. Orphaned.`,
+        });
+        personIdValues.set(i, persistVal);
+      }
+    }
+  }
+
+  return { results, graphNodes, graphEdges, personIdValues };
+}
+
+function bfsResolve(
+  adjacency: Map<string, Set<string>>,
+  start: string,
+  targetNs: string
+): string | null {
+  const visited = new Set<string>();
+  const queue = [start];
+  visited.add(start);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const ns = current.split(':')[0];
+    if (ns === targetNs && current !== start) {
+      return current;
+    }
+    const neighbors = adjacency.get(current);
+    if (neighbors) {
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function buildIdentityGraph(scenario: Scenario, config: StitchConfig): { graphNodes: GraphNode[]; graphEdges: GraphEdge[] } {
+  const nodeMap = new Map<string, GraphNode>();
+  const edges: GraphEdge[] = [];
+
+  // Collect all identifier pairs from events
+  for (let i = 0; i < scenario.events.length; i++) {
+    const evt = scenario.events[i];
+    const ids = Object.entries(evt.identifiers) as [NamespaceId, string][];
+
+    // Add nodes
+    for (const [ns, val] of ids) {
+      const key = `${ns}:${val}`;
+      if (!nodeMap.has(key)) {
+        const nsInfo = getNsLevel(ns);
+        nodeMap.set(key, { id: key, namespace: ns, value: val, level: nsInfo });
+      }
+    }
+
+    // Add edges between all identifier pairs on the same event
+    for (let a = 0; a < ids.length; a++) {
+      for (let b = a + 1; b < ids.length; b++) {
+        edges.push({
+          source: ids[a][1],
+          target: ids[b][1],
+          sourceNs: ids[a][0],
+          targetNs: ids[b][0],
+          fromEvent: i,
+          active: true,
+        });
+      }
+    }
+  }
+
+  // Apply IOA / unique namespace constraints for GBS
+  if (config.method === 'gbs' && config.ioaEnabled) {
+    applyIOA(edges, config.uniqueNamespaces);
+  }
+
+  return { graphNodes: Array.from(nodeMap.values()), graphEdges: edges };
+}
+
+function applyIOA(edges: GraphEdge[], uniqueNamespaces: NamespaceId[]) {
+  // For each unique namespace, only keep the most recent edge linking a device ID to it
+  // This simulates Identity Optimization Algorithm removing stale links
+  for (const uniqueNs of uniqueNamespaces) {
+    // Group edges involving this unique namespace by the OTHER side's value
+    const deviceToPersonEdges = new Map<string, GraphEdge[]>();
+    for (const edge of edges) {
+      if (edge.sourceNs === uniqueNs || edge.targetNs === uniqueNs) {
+        const otherSide = edge.sourceNs === uniqueNs
+          ? `${edge.targetNs}:${edge.target}`
+          : `${edge.sourceNs}:${edge.source}`;
+        const otherNsLevel = getNsLevel(edge.sourceNs === uniqueNs ? edge.targetNs : edge.sourceNs);
+        if (otherNsLevel === 'device') {
+          if (!deviceToPersonEdges.has(otherSide)) deviceToPersonEdges.set(otherSide, []);
+          deviceToPersonEdges.get(otherSide)!.push(edge);
+        }
+      }
+    }
+
+    // For each device identifier, keep only the latest edge to a unique namespace
+    for (const [_deviceKey, deviceEdges] of deviceToPersonEdges) {
+      if (deviceEdges.length <= 1) continue;
+      // Sort by event index (latest first)
+      deviceEdges.sort((a, b) => b.fromEvent - a.fromEvent);
+      // Deactivate all but the latest
+      for (let i = 1; i < deviceEdges.length; i++) {
+        deviceEdges[i].active = false;
+      }
+    }
+  }
+}
+
+function buildRawGraph(scenario: Scenario): { graphNodes: GraphNode[]; graphEdges: GraphEdge[] } {
+  const nodeMap = new Map<string, GraphNode>();
+  const edges: GraphEdge[] = [];
+
+  for (let i = 0; i < scenario.events.length; i++) {
+    const evt = scenario.events[i];
+    const ids = Object.entries(evt.identifiers) as [NamespaceId, string][];
+
+    for (const [ns, val] of ids) {
+      const key = `${ns}:${val}`;
+      if (!nodeMap.has(key)) {
+        nodeMap.set(key, { id: key, namespace: ns, value: val, level: getNsLevel(ns) });
+      }
+    }
+
+    for (let a = 0; a < ids.length; a++) {
+      for (let b = a + 1; b < ids.length; b++) {
+        edges.push({
+          source: ids[a][1],
+          target: ids[b][1],
+          sourceNs: ids[a][0],
+          targetNs: ids[b][0],
+          fromEvent: i,
+          active: true,
+        });
+      }
+    }
+  }
+
+  return { graphNodes: Array.from(nodeMap.values()), graphEdges: edges };
+}
+
+function groupByDatasetAndPersistent(
+  events: TimelineEvent[],
+  persistentId: NamespaceId
+): Map<string, number[]> {
+  const groups = new Map<string, number[]>();
+  for (let i = 0; i < events.length; i++) {
+    const evt = events[i];
+    const pVal = evt.identifiers[persistentId];
+    if (!pVal) {
+      // Events without persistent ID get their own group
+      const key = `__no_persistent_${i}`;
+      groups.set(key, [i]);
+      continue;
+    }
+    const key = `${evt.dataset}:${pVal}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(i);
+  }
+  return groups;
+}
+
+function getNsLevel(ns: NamespaceId): 'device' | 'person' {
+  const deviceNs: NamespaceId[] = ['ECID', 'TealiumVisitorID', 'MunchkinID'];
+  return deviceNs.includes(ns) ? 'device' : 'person';
+}
+
+function getPersistentValue(evt: TimelineEvent, ns: NamespaceId): string | undefined {
+  return evt.identifiers[ns];
+}
+
+function getFirstIdentifier(evt: TimelineEvent): string {
+  const vals = Object.values(evt.identifiers);
+  return vals[0] || 'unknown';
+}

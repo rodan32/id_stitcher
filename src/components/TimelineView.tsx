@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Scenario, StitchConfig, NamespaceId } from '../data/types';
 import { StitchOutput } from '../engine/stitcher';
 import { getNamespace, getDataset } from '../data/namespaces';
+import { getDeviceIcon } from './DeviceIcons';
 
 interface Props {
   scenario: Scenario;
@@ -199,8 +200,22 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
                 className="transition-opacity duration-300"
               />
 
-              {/* Step number inside circle */}
-              <text x={cx} y={cy + 1} fill="white" fontSize={14} fontWeight={700} textAnchor="middle" dominantBaseline="middle">
+              {/* Device icon inside circle */}
+              {(() => {
+                const DevIcon = getDeviceIcon(evt.device);
+                return <DevIcon x={cx} y={cy} size={26} opacity={isOrphaned && config.method !== 'none' ? 0.4 : 1} />;
+              })()}
+
+              {/* Step number badge (top-left) */}
+              <circle
+                cx={cx - EVENT_RADIUS + 4} cy={cy - EVENT_RADIUS + 4} r={9}
+                fill="#111827" stroke={getDataset(evt.dataset)?.color || '#666'} strokeWidth={1.5}
+              />
+              <text
+                x={cx - EVENT_RADIUS + 4} y={cy - EVENT_RADIUS + 5}
+                fill="white" fontSize={10} fontWeight={700}
+                textAnchor="middle" dominantBaseline="middle"
+              >
                 {evt.step}
               </text>
 

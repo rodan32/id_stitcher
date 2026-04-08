@@ -10,7 +10,7 @@ interface Props {
 export function EventDetail({ events, results }: Props) {
   return (
     <div className="bg-gray-900 border-t border-gray-700 overflow-auto max-h-64">
-      <table className="w-full text-xs">
+      <table className="w-full text-sm">
         <thead>
           <tr className="text-gray-400 border-b border-gray-700">
             <th className="px-3 py-2 text-left font-semibold">Step</th>

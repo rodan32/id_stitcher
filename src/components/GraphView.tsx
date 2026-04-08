@@ -27,7 +27,6 @@ export function GraphView({ stitchOutput, config }: Props) {
       nodeMap.set(n.id, { ...n, x: undefined, y: undefined });
     }
 
-    // Deduplicate edges
     const edgeSet = new Set<string>();
     const links: SimLink[] = [];
     for (const e of stitchOutput.graphEdges) {
@@ -74,8 +73,8 @@ export function GraphView({ stitchOutput, config }: Props) {
 
     // Simulation
     const simulation = d3.forceSimulation<SimNode>(nodes)
-      .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(100))
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(120))
+      .force('charge', d3.forceManyBody().strength(-400))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('x', d3.forceX(width / 2).strength(0.05))
       .force('y', d3.forceY(height / 2).strength(0.05));
@@ -85,21 +84,22 @@ export function GraphView({ stitchOutput, config }: Props) {
       .selectAll('line')
       .data(links)
       .join('line')
-      .attr('stroke', d => d.active ? '#4b5563' : '#ef4444')
-      .attr('stroke-width', d => d.active ? 1.5 : 1)
-      .attr('stroke-dasharray', d => d.active ? null : '6 3')
-      .attr('opacity', d => d.active ? 0.7 : 0.3);
+      .attr('stroke', d => d.active ? '#6b7280' : '#ef4444')
+      .attr('stroke-width', d => d.active ? 2 : 1.5)
+      .attr('stroke-dasharray', d => d.active ? null : '8 4')
+      .attr('opacity', d => d.active ? 0.6 : 0.35);
 
-    // IOA removed edge label
+    // IOA removed edge labels
     const removedLabels = g.append('g')
       .selectAll('text')
       .data(links.filter(l => !l.active))
       .join('text')
       .text('IOA removed')
       .attr('fill', '#ef4444')
-      .attr('font-size', 8)
+      .attr('font-size', 10)
+      .attr('font-weight', 600)
       .attr('text-anchor', 'middle')
-      .attr('opacity', 0.6);
+      .attr('opacity', 0.7);
 
     // Nodes
     const nodeGroup = g.append('g')
@@ -118,7 +118,7 @@ export function GraphView({ stitchOutput, config }: Props) {
         })
       );
 
-    // Node shapes: circles for device, rounded rects for person
+    // Node shapes
     nodeGroup.each(function (d) {
       const el = d3.select(this);
       const nsInfo = getNamespace(d.namespace);
@@ -126,16 +126,16 @@ export function GraphView({ stitchOutput, config }: Props) {
 
       if (d.level === 'device') {
         el.append('circle')
-          .attr('r', 20)
+          .attr('r', 26)
           .attr('fill', color)
           .attr('opacity', 0.85)
           .attr('stroke', '#1f2937')
           .attr('stroke-width', 2);
       } else {
         el.append('rect')
-          .attr('x', -28).attr('y', -16)
-          .attr('width', 56).attr('height', 32)
-          .attr('rx', 8)
+          .attr('x', -36).attr('y', -20)
+          .attr('width', 72).attr('height', 40)
+          .attr('rx', 10)
           .attr('fill', color)
           .attr('opacity', 0.85)
           .attr('stroke', '#1f2937')
@@ -143,25 +143,26 @@ export function GraphView({ stitchOutput, config }: Props) {
       }
     });
 
-    // Node labels (value)
+    // Node value label
     nodeGroup.append('text')
-      .text(d => truncateLabel(d.value))
+      .text(d => truncateLabel(d.value, 12))
       .attr('fill', 'white')
-      .attr('font-size', 9)
-      .attr('font-weight', 600)
+      .attr('font-size', 11)
+      .attr('font-weight', 700)
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle');
 
-    // Namespace label below
+    // Namespace label below node
     nodeGroup.append('text')
       .text(d => {
         const ns = getNamespace(d.namespace);
         return ns?.label || d.namespace;
       })
-      .attr('fill', '#9ca3af')
-      .attr('font-size', 7)
+      .attr('fill', '#d1d5db')
+      .attr('font-size', 10)
+      .attr('font-weight', 500)
       .attr('text-anchor', 'middle')
-      .attr('dy', d => d.level === 'device' ? 30 : 26);
+      .attr('dy', d => d.level === 'device' ? 38 : 32);
 
     simulation.on('tick', () => {
       link
@@ -172,7 +173,7 @@ export function GraphView({ stitchOutput, config }: Props) {
 
       removedLabels
         .attr('x', d => ((d.source as SimNode).x! + (d.target as SimNode).x!) / 2)
-        .attr('y', d => ((d.source as SimNode).y! + (d.target as SimNode).y!) / 2 - 6);
+        .attr('y', d => ((d.source as SimNode).y! + (d.target as SimNode).y!) / 2 - 8);
 
       nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
     });
@@ -184,28 +185,29 @@ export function GraphView({ stitchOutput, config }: Props) {
     <div ref={containerRef} className="flex-1 bg-gray-950 relative">
       <svg ref={svgRef} className="w-full h-full" />
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-gray-900/90 rounded-lg p-3 text-xs space-y-1 border border-gray-700">
-        <div className="font-semibold text-gray-300 mb-2">Identity Graph</div>
-        <div className="flex items-center gap-2 text-gray-400">
-          <svg width={16} height={16}><circle cx={8} cy={8} r={6} fill="#3b82f6" /></svg>
+      <div className="absolute bottom-4 left-4 bg-gray-900/90 rounded-lg p-3 text-sm space-y-1.5 border border-gray-700">
+        <div className="font-semibold text-gray-200 mb-2">Identity Graph</div>
+        <div className="flex items-center gap-2 text-gray-300">
+          <svg width={18} height={18}><circle cx={9} cy={9} r={7} fill="#3b82f6" /></svg>
           Device-level (circle)
         </div>
-        <div className="flex items-center gap-2 text-gray-400">
-          <svg width={16} height={16}><rect x={1} y={3} width={14} height={10} rx={3} fill="#10b981" /></svg>
-          Person-level (rounded)
+        <div className="flex items-center gap-2 text-gray-300">
+          <svg width={18} height={18}><rect x={1} y={3} width={16} height={12} rx={4} fill="#10b981" /></svg>
+          Person-level (rounded rect)
         </div>
         {config.method === 'gbs' && config.ioaEnabled && (
           <div className="flex items-center gap-2 text-red-400">
-            <svg width={16} height={4}><line x1={0} y1={2} x2={16} y2={2} stroke="#ef4444" strokeDasharray="4 2" /></svg>
+            <svg width={18} height={6}><line x1={0} y1={3} x2={18} y2={3} stroke="#ef4444" strokeWidth={2} strokeDasharray="5 3" /></svg>
             IOA removed link
           </div>
         )}
+        <div className="text-xs text-gray-500 pt-1">Drag nodes to rearrange. Scroll to zoom.</div>
       </div>
     </div>
   );
 }
 
-function truncateLabel(s: string): string {
-  if (s.length > 10) return s.slice(0, 9) + '\u2026';
+function truncateLabel(s: string, max: number): string {
+  if (s.length > max) return s.slice(0, max - 1) + '\u2026';
   return s;
 }

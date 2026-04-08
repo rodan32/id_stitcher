@@ -188,21 +188,6 @@ export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigCha
         </div>
       )}
 
-      {/* Verdict */}
-      <div className="p-4 mt-auto">
-        <div className={`rounded-lg p-3 text-sm ${
-          scenario.verdictColor === 'green' ? 'bg-green-900/50 text-green-300 border border-green-700' :
-          scenario.verdictColor === 'orange' ? 'bg-amber-900/50 text-amber-300 border border-amber-700' :
-          'bg-red-900/50 text-red-300 border border-red-700'
-        }`}>
-          <div className="font-semibold mb-1">
-            {scenario.verdictColor === 'green' ? 'FULLY STITCHABLE' :
-             scenario.verdictColor === 'orange' ? 'PARTIALLY STITCHABLE' :
-             'NOT STITCHABLE'}
-          </div>
-          <p className="text-xs opacity-80">{scenario.verdictText}</p>
-        </div>
-      </div>
     </div>
   );
 }

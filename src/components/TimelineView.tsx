@@ -3,6 +3,7 @@ import { Scenario, StitchConfig, NamespaceId } from '../data/types';
 import { StitchOutput } from '../engine/stitcher';
 import { getNamespace, getDataset } from '../data/namespaces';
 import { getDeviceIcon } from './DeviceIcons';
+import { VerdictBox } from './VerdictBox';
 
 interface Props {
   scenario: Scenario;
@@ -259,6 +260,11 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
           </g>
         )}
       </svg>
+
+      {/* Verdict below diagram */}
+      <div className="mt-4 max-w-2xl">
+        <VerdictBox scenario={scenario} />
+      </div>
     </div>
   );
 }

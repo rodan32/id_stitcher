@@ -46,6 +46,8 @@ export interface Scenario {
   subtitle: string;
   journey: string;
   events: TimelineEvent[];
+  /** How many distinct real-world people are in this scenario */
+  realPeopleCount: number;
   verdictColor: 'green' | 'orange' | 'red';
   verdictText: string;
 }

@@ -7,6 +7,8 @@ import { getNamespace } from '../data/namespaces';
 interface Props {
   stitchOutput: StitchOutput;
   config: StitchConfig;
+  /** Vertical rule between timeline and graph in split view */
+  edgeDivider?: boolean;
 }
 
 interface SimNode extends GraphNode, d3.SimulationNodeDatum {}
@@ -17,7 +19,7 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
   fromEvent: number;
 }
 
-export function GraphView({ stitchOutput, config }: Props) {
+export function GraphView({ stitchOutput, config, edgeDivider }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -182,7 +184,10 @@ export function GraphView({ stitchOutput, config }: Props) {
   }, [nodes, links]);
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 min-w-0 bg-gray-950 relative">
+    <div
+      ref={containerRef}
+      className={`flex-1 min-h-0 min-w-0 bg-transparent relative ${edgeDivider ? 'border-l border-gray-700/50' : ''}`}
+    >
       <svg ref={svgRef} className="w-full h-full" />
       {/* Legend */}
       <div className="absolute bottom-4 left-4 bg-gray-900/90 rounded-lg p-3 text-sm space-y-1.5 border border-gray-700">

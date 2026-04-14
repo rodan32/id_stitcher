@@ -9,10 +9,10 @@ interface Props {
 
 export function EventDetail({ events, results }: Props) {
   return (
-    <div className="bg-gray-900 border-t border-gray-700 overflow-auto max-h-40 xl:max-h-64">
+    <div className="scroll-styled bg-gray-900/60 overflow-auto max-h-[min(42vh,15rem)] sm:max-h-[min(46vh,18rem)] xl:max-h-[min(52vh,26rem)]">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-gray-400 border-b border-gray-700">
+          <tr className="text-gray-400 border-b border-gray-700 sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm shadow-[0_1px_0_0_rgb(55_65_81/0.6)]">
             <th className="px-3 py-2 text-left font-semibold">Step</th>
             <th className="px-3 py-2 text-left font-semibold">Device</th>
             <th className="px-3 py-2 text-left font-semibold">Dataset</th>

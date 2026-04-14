@@ -13,7 +13,7 @@ interface Props {
 
 const LANE_HEIGHT = 100;
 const EVENT_RADIUS = 28;
-const STEP_WIDTH = 180;
+const STEP_WIDTH_BASE = 180;
 const LANE_LABEL_WIDTH = 160;
 const TOP_PADDING = 80;
 const CLUSTER_PAD_X = 14;
@@ -58,11 +58,21 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
     });
   }, [config.method, stitchOutput]);
 
-  const width = LANE_LABEL_WIDTH + STEP_WIDTH * scenario.events.length + 80;
+  // Tighter columns when many steps so wide journeys need less horizontal scroll
+  const stepWidth =
+    scenario.events.length > 12
+      ? 148
+      : scenario.events.length > 9
+        ? 158
+        : scenario.events.length > 7
+          ? 168
+          : STEP_WIDTH_BASE;
+
+  const width = LANE_LABEL_WIDTH + stepWidth * scenario.events.length + 80;
   const height = TOP_PADDING + LANE_HEIGHT * datasets.length + 60;
 
   return (
-    <div className="overflow-auto flex-1 min-h-0 min-w-0 bg-gray-950 p-3 xl:p-4">
+    <div className="scroll-styled overflow-auto flex-1 min-h-0 min-w-0 bg-transparent p-3 xl:p-4">
       <div className="mb-4">
         <h2 className="text-lg font-bold text-white">{scenario.id}. {scenario.title}</h2>
         <p className="text-sm text-gray-400">{scenario.journey}</p>
@@ -96,7 +106,7 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
 
         {/* Step column headers */}
         {scenario.events.map((evt, i) => {
-          const x = LANE_LABEL_WIDTH + i * STEP_WIDTH + STEP_WIDTH / 2;
+          const x = LANE_LABEL_WIDTH + i * stepWidth + stepWidth / 2;
           return (
             <g key={`header-${i}`}>
               <text x={x} y={22} fill="#d1d5db" fontSize={13} textAnchor="middle" fontWeight={700}>
@@ -122,7 +132,7 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
             const evt = scenario.events[idx];
             const laneIdx = datasets.indexOf(evt.dataset);
             return {
-              cx: LANE_LABEL_WIDTH + idx * STEP_WIDTH + STEP_WIDTH / 2,
+              cx: LANE_LABEL_WIDTH + idx * stepWidth + stepWidth / 2,
               cy: TOP_PADDING + laneIdx * LANE_HEIGHT + LANE_HEIGHT / 2,
             };
           });
@@ -164,12 +174,12 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
         })}
 
         {/* Stitch connecting arcs */}
-        {renderStitchArcs(scenario, stitchOutput, datasets, clusters)}
+        {renderStitchArcs(scenario, stitchOutput, datasets, clusters, stepWidth)}
 
         {/* Event nodes */}
         {scenario.events.map((evt, i) => {
           const laneIdx = datasets.indexOf(evt.dataset);
-          const cx = LANE_LABEL_WIDTH + i * STEP_WIDTH + STEP_WIDTH / 2;
+          const cx = LANE_LABEL_WIDTH + i * stepWidth + stepWidth / 2;
           const cy = TOP_PADDING + laneIdx * LANE_HEIGHT + LANE_HEIGHT / 2;
           const result = stitchOutput.results[i];
           const isOrphaned = result?.isOrphaned;
@@ -285,7 +295,13 @@ interface ClusterInfo {
   style: { fill: string; stroke: string; text: string };
 }
 
-function renderStitchArcs(scenario: Scenario, output: StitchOutput, datasets: string[], clusters: ClusterInfo[]) {
+function renderStitchArcs(
+  scenario: Scenario,
+  output: StitchOutput,
+  datasets: string[],
+  clusters: ClusterInfo[],
+  stepWidth: number,
+) {
   const arcs: React.ReactElement[] = [];
 
   let arcIdx = 0;
@@ -303,9 +319,9 @@ function renderStitchArcs(scenario: Scenario, output: StitchOutput, datasets: st
       const fromLane = datasets.indexOf(fromEvt.dataset);
       const toLane = datasets.indexOf(toEvt.dataset);
 
-      const x1 = LANE_LABEL_WIDTH + fromIdx * STEP_WIDTH + STEP_WIDTH / 2;
+      const x1 = LANE_LABEL_WIDTH + fromIdx * stepWidth + stepWidth / 2;
       const y1 = TOP_PADDING + fromLane * LANE_HEIGHT + LANE_HEIGHT / 2;
-      const x2 = LANE_LABEL_WIDTH + toIdx * STEP_WIDTH + STEP_WIDTH / 2;
+      const x2 = LANE_LABEL_WIDTH + toIdx * stepWidth + stepWidth / 2;
       const y2 = TOP_PADDING + toLane * LANE_HEIGHT + LANE_HEIGHT / 2;
 
       const isCrossDataset = fromEvt.dataset !== toEvt.dataset;

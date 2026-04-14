@@ -82,21 +82,30 @@ export default function App() {
           onConfigChange={setConfig}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Visualization area */}
-          <div className={`flex-1 overflow-hidden ${
-            effectiveView === 'split'
-              ? isCompact ? 'flex flex-col' : 'flex'
-              : 'flex'
-          }`}>
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-gray-950">
+          {/* Upper: journey + graph — slightly raised surface vs. detail table */}
+          <div
+            className={`flex-1 min-h-0 overflow-hidden rounded-sm border-b border-gray-700/80 bg-gradient-to-b from-slate-900/35 to-gray-950/80 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.04)] ${
+              effectiveView === 'split'
+                ? isCompact ? 'flex flex-col' : 'flex'
+                : 'flex'
+            }`}
+          >
             {(effectiveView === 'timeline' || effectiveView === 'split') && (
               <TimelineView scenario={scenario} config={config} stitchOutput={stitchOutput} />
             )}
             {(effectiveView === 'graph' || effectiveView === 'split') && (
-              <GraphView stitchOutput={stitchOutput} config={config} />
+              <GraphView
+                stitchOutput={stitchOutput}
+                config={config}
+                edgeDivider={effectiveView === 'split'}
+              />
             )}
           </div>
-          <EventDetail events={scenario.events} results={stitchOutput.results} />
+          {/* Lower: event detail table — distinct band */}
+          <div className="shrink-0 flex flex-col min-h-0 border-t border-gray-600/35 bg-gray-950/95 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.03)]">
+            <EventDetail events={scenario.events} results={stitchOutput.results} />
+          </div>
         </div>
       </div>
     </div>

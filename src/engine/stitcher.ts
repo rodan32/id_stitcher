@@ -149,14 +149,31 @@ function computeFBS(
           personIdValues.set(idx, val);
         } else if (idx < firstTransient.index) {
           // Pre-first-auth: replay stitches to first transient value
-          results.push({
-            eventIndex: idx,
-            resolvedPersonId: firstTransient.value,
-            stitchType: 'replay',
-            isOrphaned: false,
-            explanation: `Replay stitch: re-keyed to ${firstTransient.value} (first ${config.transientId} on this ${config.persistentId}).`,
-          });
-          personIdValues.set(idx, firstTransient.value);
+          // Enforce replay window: if dayOffset is set, check temporal distance
+          const evtDay = evt.dayOffset ?? 0;
+          const authDay = scenario.events[firstTransient.index].dayOffset ?? 0;
+          const gap = Math.abs(authDay - evtDay);
+
+          if (gap > config.replayWindow) {
+            const persistVal = evt.identifiers[config.persistentId];
+            results.push({
+              eventIndex: idx,
+              resolvedPersonId: persistVal || null,
+              stitchType: 'none',
+              isOrphaned: true,
+              explanation: `Outside ${config.replayWindow}-day replay window (${gap} days from auth). Cannot replay-stitch.`,
+            });
+            personIdValues.set(idx, persistVal || null);
+          } else {
+            results.push({
+              eventIndex: idx,
+              resolvedPersonId: firstTransient.value,
+              stitchType: 'replay',
+              isOrphaned: false,
+              explanation: `Replay stitch: re-keyed to ${firstTransient.value} (within ${config.replayWindow}-day window).`,
+            });
+            personIdValues.set(idx, firstTransient.value);
+          }
         } else {
           // Between auths or after last auth
           // Find the most recent transient before this event
@@ -164,14 +181,31 @@ function computeFBS(
           for (const tv of transientValues) {
             if (tv.index <= idx) nearest = tv;
           }
-          results.push({
-            eventIndex: idx,
-            resolvedPersonId: nearest.value,
-            stitchType: 'replay',
-            isOrphaned: false,
-            explanation: `Replay stitch: re-keyed to ${nearest.value} (most recent ${config.transientId}).`,
-          });
-          personIdValues.set(idx, nearest.value);
+          // Enforce replay window
+          const evtDay = evt.dayOffset ?? 0;
+          const nearestDay = scenario.events[nearest.index].dayOffset ?? 0;
+          const gap = Math.abs(evtDay - nearestDay);
+
+          if (gap > config.replayWindow) {
+            const persistVal = evt.identifiers[config.persistentId];
+            results.push({
+              eventIndex: idx,
+              resolvedPersonId: persistVal || null,
+              stitchType: 'none',
+              isOrphaned: true,
+              explanation: `Outside ${config.replayWindow}-day replay window (${gap} days from nearest auth). Cannot replay-stitch.`,
+            });
+            personIdValues.set(idx, persistVal || null);
+          } else {
+            results.push({
+              eventIndex: idx,
+              resolvedPersonId: nearest.value,
+              stitchType: 'replay',
+              isOrphaned: false,
+              explanation: `Replay stitch: re-keyed to ${nearest.value} (within ${config.replayWindow}-day window).`,
+            });
+            personIdValues.set(idx, nearest.value);
+          }
         }
       }
     }

@@ -42,6 +42,30 @@ export const DATASETS: Dataset[] = [
     sometimesPresent: ['Email', 'Phone', 'SFDCContactID'],
     nature: 'both',
   },
+  {
+    id: 'Genesys', label: 'Genesys Calls', color: '#14b8a6',
+    alwaysPresent: ['Phone'],
+    sometimesPresent: ['Email', 'SFDCContactID', 'WGU_ID'],
+    nature: 'event',
+  },
+  {
+    id: 'MarketoLeadIdentities', label: 'Marketo Lead Identities', color: '#f472b6',
+    alwaysPresent: ['MarketoLeadID'],
+    sometimesPresent: ['Email', 'MunchkinID'],
+    nature: 'profile',
+  },
+  {
+    id: 'Databricks', label: 'Databricks (Pre-Resolved)', color: '#a855f7',
+    alwaysPresent: ['Email'],
+    sometimesPresent: ['WGU_ID', 'Phone', 'SFDCContactID'],
+    nature: 'both',
+  },
+  {
+    id: 'ImportEvent', label: 'Import Event (Consolidated)', color: '#64748b',
+    alwaysPresent: [],
+    sometimesPresent: ['Email', 'Phone', 'MarketoLeadID', 'SFDCContactID'],
+    nature: 'event',
+  },
 ];
 
 export function getNamespace(id: string): Namespace | undefined {

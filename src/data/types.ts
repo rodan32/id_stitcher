@@ -12,8 +12,12 @@ export type DatasetId =
   | 'WebSDK'
   | 'Tealium'
   | 'Marketo'
+  | 'MarketoLeadIdentities'
   | 'Salesforce'
-  | 'WGUApp';
+  | 'WGUApp'
+  | 'Genesys'
+  | 'Databricks'
+  | 'ImportEvent';
 
 export interface Namespace {
   id: NamespaceId;
@@ -38,6 +42,9 @@ export interface TimelineEvent {
   dataset: DatasetId;
   identifiers: Partial<Record<NamespaceId, string>>;
   description?: string;
+  /** Days from scenario start. Used for replay window enforcement.
+   *  When undefined, the engine treats all events as within the window. */
+  dayOffset?: number;
 }
 
 export interface Scenario {

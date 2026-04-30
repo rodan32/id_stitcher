@@ -3,7 +3,7 @@ import { StitchConfig, StitchMethod, NamespaceId, DatasetId } from '../data/type
 import { NAMESPACES, DATASETS } from '../data/namespaces';
 import { SCENARIOS } from '../data/scenarios';
 import { ScenarioPerspective, scenariosForPerspective } from '../data/scenarioPerspective';
-import { CdpRealityPanel } from './CdpRealityPanel';
+import { CdpExplainerModal } from './CdpExplainerModal';
 
 interface Props {
   scenarioId: number;
@@ -13,6 +13,7 @@ interface Props {
 }
 
 export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigChange }: Props) {
+  const [explainerOpen, setExplainerOpen] = useState(false);
   const [perspective, setPerspective] = useState<ScenarioPerspective>('all');
   const filteredScenarios = useMemo(() => scenariosForPerspective(perspective), [perspective]);
 
@@ -31,7 +32,16 @@ export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigCha
 
   return (
     <div className="scroll-styled bg-gray-900 border-r border-gray-700 w-64 min-w-56 xl:w-80 xl:min-w-80 overflow-y-auto flex flex-col">
-      <CdpRealityPanel />
+      <div className="px-3 py-2.5 border-b border-gray-800 shrink-0 bg-gray-900/95">
+        <button
+          type="button"
+          onClick={() => setExplainerOpen(true)}
+          className="w-full text-left text-xs text-cyan-400 hover:text-cyan-300 underline underline-offset-[3px] decoration-cyan-700/80 hover:decoration-cyan-400 leading-snug"
+        >
+          Time-of-ingestion &amp; Tealium → CJA — full notes
+        </button>
+      </div>
+      <CdpExplainerModal open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
       {/* Scenario lens + picker */}
       <div className="p-4 border-b border-gray-700">
@@ -155,24 +165,67 @@ export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigCha
         </div>
       )}
 
-      {/* Tealium Cross-Device Toggle (visible for FBS + GBS) */}
+      {/* Tealium modeling: ingest-time vs cross-device (FBS + GBS) */}
       {config.method !== 'none' && (
-        <div className="p-4 border-b border-gray-700 space-y-2">
-          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">External Resolution</label>
-          <label className="flex items-start gap-2 text-sm text-gray-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={config.tealiumCrossDevice}
-              onChange={(e) => update({ tealiumCrossDevice: e.target.checked })}
-              className="rounded border-gray-600 bg-gray-800 text-cyan-500 mt-0.5"
-            />
-            <div>
-              <span className="font-medium">Tealium Cross-Device</span>
-              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                Simulates Tealium AudienceStream stitching visitor profiles server-side and sending resolved links to AEP. When off, each TealiumVisitorID is an isolated device cookie.
-              </p>
+        <div className="p-4 border-b border-gray-700 space-y-4">
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Tealium → AEP modeling</label>
+
+          <div className="rounded-lg border border-amber-900/45 bg-amber-950/25 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span id="ingest-tealium-label" className="text-xs font-medium text-amber-100 leading-snug pr-1">
+                Ingest-time Tealium payloads
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config.tealiumIngestTimeSemantics}
+                aria-labelledby="ingest-tealium-label"
+                onClick={() => {
+                  const next = !config.tealiumIngestTimeSemantics;
+                  update({
+                    tealiumIngestTimeSemantics: next,
+                    ...(next ? { tealiumCrossDevice: false } : {}),
+                  });
+                }}
+                className={`relative h-6 w-10 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
+                  config.tealiumIngestTimeSemantics ? 'bg-amber-600' : 'bg-gray-700'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                    config.tealiumIngestTimeSemantics ? 'translate-x-[1.125rem]' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
-          </label>
+            <p className="text-[10px] text-amber-200/75 leading-relaxed">
+              Each Tealium row only carries person-level IDs that first appear on that visitor (same TVID or ECID) at or before this step in the journey—like the payload AEP received at send time. Cross-device enrichment is incompatible and turns off while this is on.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">External resolution</label>
+            <label className={`flex items-start gap-2 text-sm ${config.tealiumIngestTimeSemantics ? 'text-gray-500' : 'text-gray-300 cursor-pointer'}`}>
+              <input
+                type="checkbox"
+                checked={config.tealiumCrossDevice}
+                disabled={config.tealiumIngestTimeSemantics}
+                onChange={e =>
+                  update({
+                    tealiumCrossDevice: e.target.checked,
+                    ...(e.target.checked ? { tealiumIngestTimeSemantics: false } : {}),
+                  })
+                }
+                className="rounded border-gray-600 bg-gray-800 text-cyan-500 mt-0.5 disabled:opacity-40"
+              />
+              <div>
+                <span className="font-medium">Tealium Cross-Device</span>
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                  Simulates AudienceStream stitching profiles server-side and forwarding resolved person IDs on every Tealium hit. Off when ingest-time payloads is on.
+                </p>
+              </div>
+            </label>
+          </div>
         </div>
       )}
 

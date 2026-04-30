@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { StitchConfig } from './data/types';
 import { SCENARIOS } from './data/scenarios';
-import { computeStitch } from './engine/stitcher';
+import { computeStitch, getStitchingScenario } from './engine/stitcher';
 import { ControlPanel } from './components/ControlPanel';
 import { TimelineView } from './components/TimelineView';
 import { GraphView } from './components/GraphView';
@@ -19,6 +19,7 @@ const DEFAULT_CONFIG: StitchConfig = {
   replayWindow: 7,
   profileEnabledDatasets: ['WebSDK', 'Tealium', 'Marketo'],
   tealiumCrossDevice: false,
+  tealiumIngestTimeSemantics: false,
 };
 
 function useIsCompact() {
@@ -41,6 +42,10 @@ export default function App() {
   const effectiveView = viewMode;
 
   const scenario = useMemo(() => SCENARIOS.find(s => s.id === scenarioId)!, [scenarioId]);
+  const displayScenario = useMemo(
+    () => ({ ...scenario, events: getStitchingScenario(scenario, config).events }),
+    [scenario, config],
+  );
   const stitchOutput = useMemo(() => computeStitch(scenario, config), [scenario, config]);
 
   return (
@@ -98,7 +103,7 @@ export default function App() {
             }`}
           >
             {(effectiveView === 'timeline' || effectiveView === 'split') && (
-              <TimelineView scenario={scenario} config={config} stitchOutput={stitchOutput} />
+              <TimelineView scenario={displayScenario} config={config} stitchOutput={stitchOutput} />
             )}
             {(effectiveView === 'graph' || effectiveView === 'split') && (
               <GraphView
@@ -110,7 +115,7 @@ export default function App() {
           </div>
           {/* Lower: event detail table — distinct band */}
           <div className="shrink-0 flex flex-col min-h-0 border-t border-gray-600/35 bg-gray-950/95 shadow-[inset_0_1px_0_0_rgb(255_255_255/0.03)]">
-            <EventDetail events={scenario.events} results={stitchOutput.results} />
+            <EventDetail events={displayScenario.events} results={stitchOutput.results} />
           </div>
         </div>
       </div>

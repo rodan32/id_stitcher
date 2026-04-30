@@ -7,17 +7,25 @@ export interface StitchOutput {
   personIdValues: Map<number, string | null>;
 }
 
+/** Scenario after Tealium ingest-time strip and optional cross-device enrichment (matches computeStitch preprocessing). */
+export function getStitchingScenario(scenario: Scenario, config: StitchConfig): Scenario {
+  if (config.method === 'none') return scenario;
+  let working = scenario;
+  if (config.tealiumIngestTimeSemantics) {
+    working = applyTealiumIngestTimeSemantics(working);
+  }
+  if (config.tealiumCrossDevice && !config.tealiumIngestTimeSemantics) {
+    working = applyTealiumEnrichment(working);
+  }
+  return working;
+}
+
 export function computeStitch(scenario: Scenario, config: StitchConfig): StitchOutput {
   if (config.method === 'none') {
     return computeNoStitch(scenario);
   }
 
-  // When Tealium cross-device is enabled, pre-enrich Tealium events:
-  // if one TealiumVisitorID has a person-level ID and another doesn't,
-  // Tealium's master profile would have resolved it and sent it downstream.
-  const effectiveScenario = config.tealiumCrossDevice
-    ? applyTealiumEnrichment(scenario)
-    : scenario;
+  const effectiveScenario = getStitchingScenario(scenario, config);
 
   const { graphNodes, graphEdges } = buildIdentityGraph(effectiveScenario, config);
 
@@ -35,6 +43,58 @@ export function computeStitch(scenario: Scenario, config: StitchConfig): StitchO
  * level ID get enriched with one, as if Tealium sent the resolved identity
  * downstream to AEP.
  */
+/**
+ * Simulates Tealium→AEP time-of-ingestion: each Tealium row may only include
+ * person-level identifiers that AudienceStream had attached by that point in
+ * the visitor timeline (same TVID / ECID group, scenario order).
+ */
+function applyTealiumIngestTimeSemantics(scenario: Scenario): Scenario {
+  const PERSON_NS: NamespaceId[] = ['Email', 'Phone', 'WGU_ID', 'MarketoLeadID', 'SFDCContactID', 'MunchkinID'];
+  const events = scenario.events;
+
+  const keyFor = (evt: TimelineEvent, idx: number): string | null => {
+    if (evt.dataset !== 'Tealium') return null;
+    const tv = evt.identifiers.TealiumVisitorID;
+    if (tv) return `tv:${tv}`;
+    const ecid = evt.identifiers.ECID;
+    if (ecid) return `ecid:${ecid}`;
+    return `solo:${idx}`;
+  };
+
+  const firstAppear = new Map<string, Map<NamespaceId, number>>();
+
+  for (let i = 0; i < events.length; i++) {
+    const evt = events[i];
+    const key = keyFor(evt, i);
+    if (!key) continue;
+    if (!firstAppear.has(key)) firstAppear.set(key, new Map());
+    const m = firstAppear.get(key)!;
+    for (const ns of PERSON_NS) {
+      const val = evt.identifiers[ns];
+      if (val && !m.has(ns)) m.set(ns, i);
+    }
+  }
+
+  const newEvents = events.map((evt, i) => {
+    if (evt.dataset !== 'Tealium') return evt;
+    const key = keyFor(evt, i);
+    if (!key) return evt;
+    const m = firstAppear.get(key);
+    if (!m) return evt;
+    const newIds = { ...evt.identifiers };
+    for (const ns of PERSON_NS) {
+      if (!newIds[ns]) continue;
+      const first = m.get(ns);
+      if (first !== undefined && first > i) {
+        delete newIds[ns];
+      }
+    }
+    return { ...evt, identifiers: newIds };
+  });
+
+  return { ...scenario, events: newEvents };
+}
+
 function applyTealiumEnrichment(scenario: Scenario): Scenario {
   const PERSON_NS: NamespaceId[] = ['Email', 'Phone', 'WGU_ID', 'MarketoLeadID', 'SFDCContactID'];
 
@@ -378,7 +438,7 @@ function buildIdentityGraph(scenario: Scenario, config: StitchConfig): { graphNo
   // a person-level identifier through Tealium events. This simulates
   // AudienceStream stitching profiles server-side and feeding resolved
   // links into the AEP identity graph.
-  if (config.tealiumCrossDevice) {
+  if (config.tealiumCrossDevice && !config.tealiumIngestTimeSemantics) {
     addTealiumCrossDeviceBridges(scenario, nodeMap, edges);
   }
 

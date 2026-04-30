@@ -71,6 +71,8 @@ export interface StitchConfig {
   replayWindow: 1 | 7 | 14 | 30;
   profileEnabledDatasets: DatasetId[];
   tealiumCrossDevice: boolean;
+  /** When true, Tealium rows only carry person-level IDs after they first appear on that visitor in journey order (send-time); disables cross-device enrichment. */
+  tealiumIngestTimeSemantics: boolean;
 }
 
 export interface StitchResult {

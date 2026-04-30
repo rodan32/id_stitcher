@@ -83,15 +83,23 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
         <p className="text-sm text-gray-400">{scenario.journey}</p>
         {hasTealiumStream && (
           <div
-            className="flex gap-2 rounded-md border border-cyan-800/40 bg-cyan-950/25 px-3 py-2 text-xs text-cyan-100/90 leading-snug"
+            className="rounded-md border border-cyan-800/40 bg-cyan-950/25 px-3 py-2 text-xs text-cyan-100/90 leading-snug space-y-2"
             role="note"
           >
-            <span className="text-cyan-400 shrink-0 font-bold" aria-hidden>⏱</span>
-            <p>
-              <span className="font-semibold text-cyan-200">Time-of-ingestion (Tealium → AEP):</span>{' '}
-              each row reflects AudienceStream <span className="text-cyan-100 font-medium">when that event was forwarded</span>, not the profile’s latest view days later.
-              Later enrichment does not rewrite earlier AEP rows unless you use FBS replay (your window), GBS, or warehouse joins to stitched profiles.
-            </p>
+            <div className="flex gap-2">
+              <span className="text-cyan-400 shrink-0 font-bold" aria-hidden>⏱</span>
+              <p>
+                <span className="font-semibold text-cyan-200">Time-of-ingestion (Tealium → AEP):</span>{' '}
+                each row reflects AudienceStream <span className="text-cyan-100 font-medium">when that event was forwarded</span>, not the profile’s latest view days later.
+                Later enrichment does not rewrite earlier AEP rows unless you use FBS replay (your window), GBS, or warehouse joins to stitched profiles.
+              </p>
+            </div>
+            {config.tealiumIngestTimeSemantics && (
+              <p className="text-[11px] text-amber-100/95 pl-6 border-t border-cyan-800/35 pt-2">
+                <span className="font-semibold text-amber-200">Ingest-time Tealium payloads on:</span>{' '}
+                the timeline and events table show only identifiers that would have been on each Tealium hit at that point in journey order (same TVID / ECID).
+              </p>
+            )}
           </div>
         )}
       </div>

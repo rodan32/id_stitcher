@@ -9,13 +9,34 @@ export function CdpRealityPanel() {
 
   return (
     <div className="border-b border-gray-700 bg-gray-900/75">
+      {/* Pinned: always visible in sidebar (collapse does not hide this) */}
+      <div
+        className="px-3 py-2.5 border-b border-amber-900/40 bg-amber-950/30"
+        role="region"
+        aria-label="Time-of-ingestion summary"
+      >
+        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300/95 mb-1">Time-of-ingestion</p>
+        <p className="text-[11px] text-amber-50/90 leading-relaxed">
+          Each AEP row keeps the identifiers that were on the event <span className="text-white font-semibold">when it was ingested</span>
+          (for Tealium: when AudienceStream forwarded that hit)—not your profile’s “best known” identity days later unless you replay, join in the warehouse, or use graph-tier recovery.
+        </p>
+        <p className="text-[10px] text-amber-200/65 mt-1.5">
+          Events table → <span className="font-semibold text-amber-100/90">Ingest semantics</span> column per step.
+        </p>
+      </div>
+
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-gray-800/60 transition-colors"
       >
-        <span className="text-xs font-semibold text-cyan-400/95 uppercase tracking-wider">
-          Tealium CDP ↔ CJA realities
+        <span className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-xs font-semibold text-cyan-400/95 uppercase tracking-wider">
+            Diagram &amp; Tealium CDP notes
+          </span>
+          <span className="text-[10px] text-gray-500 font-normal normal-case">
+            Coverage, stitched_id join cost, activation vs analytics
+          </span>
         </span>
         <span className="text-gray-500 text-xs shrink-0">{open ? '▼' : '▶'}</span>
       </button>

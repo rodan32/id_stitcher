@@ -73,19 +73,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Time-of-ingestion: always visible (Tealium CDP + general streaming semantics) */}
-      <div
-        className="shrink-0 border-b border-amber-900/45 bg-amber-950/35 px-3 xl:px-4 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-snug text-amber-100/95"
-        role="status"
-      >
-        <span className="font-bold uppercase tracking-wide text-amber-300/95 shrink-0">Time-of-ingestion</span>
-        <span className="text-amber-100/85">
-          Rows in AEP reflect identifiers <span className="text-white font-semibold">at receipt / send</span>, not your “current best” profile days later.
-          Tealium connector events in particular stay exactly as forwarded unless you replay, join warehouse identity, or use graph-tier recovery.
-        </span>
-        <span className="text-amber-200/70 hidden lg:inline">See Events → <span className="font-semibold text-amber-200">Ingest semantics</span> per step.</span>
-      </div>
-
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         <ControlPanel

@@ -27,8 +27,8 @@ export function CdpRealityPanel() {
           <div className="grid gap-2">
             <ConcernCard
               severity="amber"
-              title="Identity frozen at ingest"
-              body="Each Tealium→AEP row carries whatever AudienceStream resolved when the event was sent. Later profile updates do not rewrite past rows—late joins stay orphaned unless FBS replay (tier window), GBS, or custom backfill."
+              title="Time-of-ingestion: identity frozen on each row"
+              body="Each Tealium→AEP row carries whatever AudienceStream resolved when that event was sent. Later profile updates do not rewrite past rows—late joins stay orphaned unless FBS replay (tier window), GBS, or custom backfill."
             />
             <ConcernCard
               severity="slate"
@@ -69,7 +69,7 @@ export function CdpRealityPanel() {
 function IngestSnapshotDiagram() {
   return (
     <div className="rounded-lg bg-gray-950/90 border border-gray-700/80 p-3 overflow-x-auto">
-      <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Ingest-time snapshot (conceptual)</p>
+      <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Time-of-ingestion — Tealium vs later profile (conceptual)</p>
       <svg viewBox="0 0 420 88" className="w-full min-w-[280px] h-[72px]" aria-label="Tealium resolves identity over time but AEP rows stay fixed at ingest unless replay or downstream join">
         <defs>
           <marker id="cdp-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">

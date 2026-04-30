@@ -88,9 +88,9 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
           >
             <span className="text-cyan-400 shrink-0 font-bold" aria-hidden>⏱</span>
             <p>
-              <span className="font-semibold text-cyan-200">Tealium → AEP:</span>{' '}
-              rows reflect AudienceStream <span className="text-cyan-100 font-medium">at send time</span>.
-              Later profile enrichment does not retroactively update prior AEP hits unless you rely on FBS replay (your window), GBS, or warehouse joins to stitched profiles.
+              <span className="font-semibold text-cyan-200">Time-of-ingestion (Tealium → AEP):</span>{' '}
+              each row reflects AudienceStream <span className="text-cyan-100 font-medium">when that event was forwarded</span>, not the profile’s latest view days later.
+              Later enrichment does not rewrite earlier AEP rows unless you use FBS replay (your window), GBS, or warehouse joins to stitched profiles.
             </p>
           </div>
         )}

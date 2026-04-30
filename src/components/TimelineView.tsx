@@ -72,12 +72,12 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
   const height = TOP_PADDING + LANE_HEIGHT * datasets.length + 60;
 
   return (
-    <div className="scroll-styled overflow-auto flex-1 min-h-0 min-w-0 bg-transparent p-3 xl:p-4">
-      <div className="mb-4">
+    <div className="flex flex-col flex-1 min-h-0 min-w-0">
+      <div className="shrink-0 px-3 xl:px-4 pt-3 xl:pt-4 pb-2">
         <h2 className="text-lg font-bold text-white">{scenario.id}. {scenario.title}</h2>
         <p className="text-sm text-gray-400">{scenario.journey}</p>
       </div>
-
+      <div className="scroll-styled overflow-auto flex-1 min-h-0 min-w-0 bg-transparent px-3 xl:px-4 pb-3 xl:pb-4">
       <svg width={width} height={height} className="font-sans">
         {/* Dataset swimlane labels + background */}
         {datasets.map((dsId, laneIdx) => {
@@ -274,6 +274,7 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
       {/* Verdict below diagram */}
       <div className="mt-4 max-w-2xl">
         <VerdictBox scenario={scenario} config={config} stitchOutput={stitchOutput} />
+      </div>
       </div>
     </div>
   );

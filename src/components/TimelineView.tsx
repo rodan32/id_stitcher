@@ -30,6 +30,11 @@ const CLUSTER_COLORS = [
 const ORPHAN_STYLE = { fill: 'rgba(239,68,68,0.06)', stroke: '#ef4444', text: '#fca5a5' };
 
 export function TimelineView({ scenario, config, stitchOutput }: Props) {
+  const hasTealiumStream = useMemo(
+    () => scenario.events.some(e => e.dataset === 'Tealium'),
+    [scenario.events],
+  );
+
   const datasets = useMemo(() => {
     const seen = new Set<string>();
     return scenario.events
@@ -73,9 +78,22 @@ export function TimelineView({ scenario, config, stitchOutput }: Props) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 min-w-0">
-      <div className="shrink-0 px-3 xl:px-4 pt-3 xl:pt-4 pb-2">
+      <div className="shrink-0 px-3 xl:px-4 pt-3 xl:pt-4 pb-2 space-y-2">
         <h2 className="text-lg font-bold text-white">{scenario.id}. {scenario.title}</h2>
         <p className="text-sm text-gray-400">{scenario.journey}</p>
+        {hasTealiumStream && (
+          <div
+            className="flex gap-2 rounded-md border border-cyan-800/40 bg-cyan-950/25 px-3 py-2 text-xs text-cyan-100/90 leading-snug"
+            role="note"
+          >
+            <span className="text-cyan-400 shrink-0 font-bold" aria-hidden>⏱</span>
+            <p>
+              <span className="font-semibold text-cyan-200">Tealium → AEP:</span>{' '}
+              rows reflect AudienceStream <span className="text-cyan-100 font-medium">at send time</span>.
+              Later profile enrichment does not retroactively update prior AEP hits unless you rely on FBS replay (your window), GBS, or warehouse joins to stitched profiles.
+            </p>
+          </div>
+        )}
       </div>
       <div className="scroll-styled overflow-auto flex-1 min-h-0 min-w-0 bg-transparent px-3 xl:px-4 pb-3 xl:pb-4">
       <svg width={width} height={height} className="font-sans">

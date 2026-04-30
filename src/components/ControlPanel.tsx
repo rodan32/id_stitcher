@@ -1,6 +1,9 @@
+import { useEffect, useMemo, useState } from 'react';
 import { StitchConfig, StitchMethod, NamespaceId, DatasetId } from '../data/types';
 import { NAMESPACES, DATASETS } from '../data/namespaces';
 import { SCENARIOS } from '../data/scenarios';
+import { ScenarioPerspective, scenariosForPerspective } from '../data/scenarioPerspective';
+import { CdpRealityPanel } from './CdpRealityPanel';
 
 interface Props {
   scenarioId: number;
@@ -10,6 +13,16 @@ interface Props {
 }
 
 export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigChange }: Props) {
+  const [perspective, setPerspective] = useState<ScenarioPerspective>('all');
+  const filteredScenarios = useMemo(() => scenariosForPerspective(perspective), [perspective]);
+
+  useEffect(() => {
+    if (!filteredScenarios.some(s => s.id === scenarioId)) {
+      const next = filteredScenarios[0]?.id ?? SCENARIOS[0].id;
+      if (next !== scenarioId) onScenarioChange(next);
+    }
+  }, [filteredScenarios, scenarioId, onScenarioChange]);
+
   const scenario = SCENARIOS.find(s => s.id === scenarioId)!;
 
   const update = (patch: Partial<StitchConfig>) => {
@@ -18,15 +31,28 @@ export function ControlPanel({ scenarioId, config, onScenarioChange, onConfigCha
 
   return (
     <div className="scroll-styled bg-gray-900 border-r border-gray-700 w-64 min-w-56 xl:w-80 xl:min-w-80 overflow-y-auto flex flex-col">
-      {/* Scenario Picker */}
+      <CdpRealityPanel />
+
+      {/* Scenario lens + picker */}
       <div className="p-4 border-b border-gray-700">
+        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Scenario lens</label>
+        <select
+          value={perspective}
+          onChange={(e) => setPerspective(e.target.value as ScenarioPerspective)}
+          className="w-full bg-gray-800 text-white text-sm rounded-lg px-3 py-2 border border-gray-600 focus:border-cyan-600 focus:outline-none mb-3"
+        >
+          <option value="all">All scenarios</option>
+          <option value="cjaReporting">CJA reporting paths (Tealium not required)</option>
+          <option value="tealiumCdp">Tealium CDP identity edges</option>
+        </select>
+
         <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Scenario</label>
         <select
           value={scenarioId}
           onChange={(e) => onScenarioChange(Number(e.target.value))}
           className="w-full bg-gray-800 text-white text-sm rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
         >
-          {SCENARIOS.map(s => (
+          {filteredScenarios.map(s => (
             <option key={s.id} value={s.id}>
               {s.id}. {s.title}
             </option>
